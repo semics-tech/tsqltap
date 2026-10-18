@@ -1,0 +1,86 @@
+# Reusable Azure DevOps job: run a database repo's tsqltap suite on a Linux agent.
+#
+# The dacpac is built by an earlier (Windows / MSBuild) job and published as a pipeline artifact;
+# this job downloads it to where [tool.tsqltap] expects it, then runs pytest. testcontainers starts
+# SQL Server in Docker, which ubuntu-latest agents have.
+#
+# Usage, from the database repo's pipeline:
+#
+#   resources:
+#     repositories:
+#       - repository: tsqltap
+#         type: github
+#         endpoint: <your GitHub service connection>
+#         name: semics-uk/tsqltap
+#
+#   jobs:
+#     - job: build_dacpac
+#       pool: { vmImage: windows-latest }
+#       steps: [ ... VSBuild ..., publish artifact "dacpac" ... ]
+#     - template: examples/azure-pipelines/tsqltap-job.yml@tsqltap
+#       parameters:
+#         dependsOn: build_dacpac
+#         artifacts:
+#           - name: dacpac
+#             path: src/Shop/bin/Release
+
+parameters:
+  - name: dependsOn
+    type: object
+    default: []
+  - name: artifacts # [{ name, path }]: pipeline artifacts to download, and where (relative to the repo)
+    type: object
+    default: []
+  - name: workingDirectory
+    type: string
+    default: $(Build.SourcesDirectory)
+  - name: pythonVersion
+    type: string
+    default: "3.12"
+  - name: pytestArgs
+    type: string
+    default: ""
+
+jobs:
+  - job: tsqltap
+    displayName: Database tests (tsqltap)
+    dependsOn: ${{ parameters.dependsOn }}
+    pool:
+      vmImage: ubuntu-latest
+    timeoutInMinutes: 30
+    steps:
+      - checkout: self
+
+      - ${{ each artifact in parameters.artifacts }}:
+          - task: DownloadPipelineArtifact@2
+            displayName: Download ${{ artifact.name }}
+            inputs:
+              artifact: ${{ artifact.name }}
+              path: ${{ parameters.workingDirectory }}/${{ artifact.path }}
+
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: ${{ parameters.pythonVersion }}
+
+      - script: |
+          set -e
+          pip install uv
+          dotnet tool install -g microsoft.sqlpackage
+          echo "##vso[task.prependpath]$HOME/.dotnet/tools"
+        displayName: Install uv and sqlpackage
+
+      - script: |
+          set -e
+          uv sync
+          uv run pytest --junitxml=$(Common.TestResultsDirectory)/tsqltap.xml -o junit_family=xunit2 ${{ parameters.pytestArgs }}
+        displayName: Run database tests
+        workingDirectory: ${{ parameters.workingDirectory }}
+
+      - task: PublishTestResults@2
+        displayName: Publish test results
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: JUnit
+          testResultsFiles: $(Common.TestResultsDirectory)/tsqltap.xml
+          testRunTitle: Database tests
+          failTaskOnFailedTests: true

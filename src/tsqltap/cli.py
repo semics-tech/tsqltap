@@ -1,0 +1,99 @@
+"""`tsqltap` command line: manage the kept container and scaffold tests. Tests run with `pytest`."""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from pathlib import Path
+
+from tsqltap.config import load
+from tsqltap.provision import Environment, ProvisionError, container_name
+
+SQL_TEMPLATE = """\
+-- tsqltap: isolation=transaction
+/*
+{name}: what this test proves, and why it matters.
+
+Runs inside a transaction that is rolled back afterwards: seed whatever rows you need.
+Assertions: tap.ok, tap.is, tap.results_eq, tap.bag_eq, tap.set_eq, tap.is_empty, tap.row_count_is,
+tap.throws_ok, tap.lives_ok, tap.has_table, tap.col_type_is, tap.has_permission, ... (see README).
+*/
+SET NOCOUNT ON;
+
+-- arrange
+-- INSERT INTO dbo.Thing (Name) VALUES (N'a');
+
+-- act / assert
+EXEC tap.ok 1, N'replace me with a real assertion';
+"""
+
+
+def _find_root(start: Path) -> Path:
+    for folder in (start, *start.parents):
+        if (folder / "pyproject.toml").exists():
+            return folder
+    return start
+
+
+def cmd_up(args: argparse.Namespace) -> int:
+    cfg = load(_find_root(Path.cwd()))
+    env = Environment(cfg, keep=True)
+    server = env.start()
+    env.provision()
+    secret = "the configured password" if cfg.password else f"password {server.password}"
+    print(f"SQL Server is up on {server.host},{server.port}  (user sa, {secret})")
+    for db in cfg.databases:
+        print(f"  {db.name}")
+    print("It stays running; `pytest --tsqltap-keep` reuses it, `tsqltap down` removes it.")
+    return 0
+
+
+def cmd_down(args: argparse.Namespace) -> int:
+    import docker
+
+    name = container_name(_find_root(Path.cwd()))
+    try:
+        docker.from_env().containers.get(name).remove(force=True)
+    except docker.errors.NotFound:
+        print(f"no kept container ({name})")
+        return 0
+    print(f"removed {name}")
+    return 0
+
+
+def cmd_new(args: argparse.Namespace) -> int:
+    path = Path(args.path)
+    if not path.name.endswith(".test.sql"):
+        path = path.with_name(path.name + ".test.sql")
+    if path.exists():
+        print(f"{path} already exists", file=sys.stderr)
+        return 1
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(SQL_TEMPLATE.format(name=path.name.split(".")[0]), encoding="utf-8")
+    print(f"created {path}")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="tsqltap", description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("up", help="start the container and build the databases, and leave it running").set_defaults(
+        func=cmd_up
+    )
+    sub.add_parser("down", help="remove this project's kept container").set_defaults(func=cmd_down)
+    new = sub.add_parser("new", help="scaffold a SQL test file")
+    new.add_argument("path", help="e.g. tests/sql/notification  (.test.sql is added)")
+    new.set_defaults(func=cmd_new)
+
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    try:
+        return int(args.func(args))
+    except ProvisionError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

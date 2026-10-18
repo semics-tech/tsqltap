@@ -1,0 +1,6 @@
+# The child table is listed first on purpose: the loader inserts parents first, by foreign key.
+dbo.Trust:
+  - {TrustCode: A1, RegionCode: E1, Name: Alpha}
+  - {TrustCode: B1, RegionCode: E1, Name: Beta}
+dbo.Region:
+  - {RegionCode: E1, Name: East}

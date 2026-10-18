@@ -1,0 +1,10 @@
+# serializer version: 1
+# name: test_active_trusts_snapshot
+  list([
+    dict({
+      'Name': 'Alpha',
+      'RegionName': 'North',
+      'TrustCode': 'A1',
+    }),
+  ])
+# ---

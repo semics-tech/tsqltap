@@ -1,0 +1,46 @@
+# Run a database repo's tsqltap suite on GitHub Actions.
+#
+# Classic SSDT projects build only on Windows (MSBuild), so the dacpac is built in one job and
+# handed to a Linux job, which has Docker for the SQL Server container. SDK-style projects
+# (Microsoft.Build.Sql) can build on Linux instead, in the test job itself.
+#
+# Copy to .github/workflows/database-tests.yml and adjust the paths.
+
+name: Database tests
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - run: msbuild src/Shop/Shop.sqlproj /p:Configuration=Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dacpac
+          path: src/Shop/bin/Release/*.dacpac
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dacpac
+          path: src/Shop/bin/Release
+      - uses: astral-sh/setup-uv@v6
+      - name: Install sqlpackage
+        run: |
+          dotnet tool install -g microsoft.sqlpackage
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - run: uv sync --locked
+      - run: uv run pytest --junitxml=junit.xml -o junit_family=xunit2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit
+          path: junit.xml

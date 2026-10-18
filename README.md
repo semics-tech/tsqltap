@@ -44,6 +44,12 @@ tests/sql/notification.test.sql::notification ,,.          [100%]
 
 No ODBC driver is needed, because [mssql-python] bundles its own.
 
+## Install
+
+```console
+$ uv add --dev tsqltap      # or: pip install tsqltap
+```
+
 ## Setup in a database repo
 
 ```toml
@@ -313,6 +319,10 @@ across as an artifact.
 
 [testcontainers]: https://testcontainers-python.readthedocs.io/
 [mssql-python]: https://github.com/microsoft/mssql-python
+
+## From the same team
+
+Also from Semics: [remote-sql-agent](https://github.com/semics-tech/remote-sql-agent).
 
 ## Licence
 

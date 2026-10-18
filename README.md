@@ -49,7 +49,7 @@ No ODBC driver is needed, because [mssql-python] bundles its own.
 ```toml
 # pyproject.toml
 [dependency-groups]
-dev = ["tsqltap"]          # from the package feed, or: tsqltap @ git+https://.../tsqltap
+dev = ["tsqltap"]          # or: uv add --dev tsqltap
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

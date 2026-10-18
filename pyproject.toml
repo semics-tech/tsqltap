@@ -33,9 +33,9 @@ dependencies = [
 snapshot = ["syrupy>=4.9"]
 
 [project.urls]
-Homepage = "https://github.com/semics-uk/tsqltap"
-Issues = "https://github.com/semics-uk/tsqltap/issues"
-Changelog = "https://github.com/semics-uk/tsqltap/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/semics-tech/tsqltap"
+Issues = "https://github.com/semics-tech/tsqltap/issues"
+Changelog = "https://github.com/semics-tech/tsqltap/blob/main/CHANGELOG.md"
 
 [project.scripts]
 tsqltap = "tsqltap.cli:main"

@@ -11,7 +11,7 @@
 #       - repository: tsqltap
 #         type: github
 #         endpoint: <your GitHub service connection>
-#         name: semics-uk/tsqltap
+#         name: semics-tech/tsqltap
 #
 #   jobs:
 #     - job: build_dacpac

@@ -3,6 +3,9 @@
 pgTAP-style testing for SQL Server. You write assertions in T-SQL, pytest runs them, and every
 run gets a disposable SQL Server container.
 
+tSQLt isn't well supported anymore and feels clunky and short on features. tsqltap is a SQL Server
+testing tool in the mould of pgTAP, which is simple and proven.
+
 ```sql
 -- tests/sql/notification.test.sql
 INSERT App.Notification (Title, Body, [Type], IsActive) VALUES (N'current', N'x', 'info', 1);
@@ -17,6 +20,65 @@ EXEC tap.throws_ok N'INSERT App.Notification ([Type]) VALUES (''bogus'')', 547, 
 $ uv run pytest
 tests/sql/notification.test.sql::notification ,,.          [100%]
 ```
+
+## Quickstart (about 10 minutes)
+
+You need Python ≥ 3.12, uv and a running Docker. No dacpac is needed: this starts from an empty
+database built by a script.
+
+```console
+$ mkdir tsqltap-demo && cd tsqltap-demo
+$ uv init --bare && uv add --dev tsqltap
+```
+
+Add to `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[[tool.tsqltap.databases]]
+name    = "Demo"
+scripts = ["tests/setup/*.sql"]
+```
+
+Create `tests/setup/01_schema.sql`:
+
+```sql
+CREATE TABLE dbo.Person (Id INT IDENTITY PRIMARY KEY, Name NVARCHAR(50) NOT NULL);
+```
+
+Create the first test with `uv run tsqltap new tests/sql/person`, then replace its placeholder
+assertion with:
+
+```sql
+INSERT dbo.Person (Name) VALUES (N'Ada');
+EXEC tap.row_count_is N'SELECT * FROM dbo.Person', 1, N'one person';
+```
+
+```console
+$ uv run pytest
+```
+
+The first run pulls the SQL Server image (a few minutes, once), starts a container, builds
+`Demo` and runs the test. Add `--tsqltap-keep` to keep the container and make later runs fast.
+To test a real project, point `dacpac` at your built `.dacpac` (see
+[Setup](#setup-in-a-database-repo)).
+
+## How it compares
+
+| | tsqltap | tSQLt | pgTAP |
+|---|---|---|---|
+| Database | SQL Server | SQL Server | PostgreSQL |
+| Tests written in | T-SQL | T-SQL | SQL |
+| Runner | pytest (`*.test.sql` plus Python tests) | `tSQLt.Run*` inside the database | `pg_prove` |
+| Library lives in | the test database only, never your dacpac | the database under test | the database under test |
+| Environment | disposable container per run | you provide the server | you provide the server |
+| CI reporting | JUnit, one `<testcase>` per assertion | via a wrapper | TAP output |
+
+tsqltap borrows pgTAP's style (`ok`, `is`, `results_eq`, `throws_ok`, TODO blocks) and offers
+tSQLt-style mocking (`fake_table`, `spy_procedure`). An existing tSQLt suite can run through an
+experimental bridge (see [Existing tests](#existing-tests)), so you can migrate one class at a time.
 
 ## How it works
 
@@ -299,8 +361,8 @@ Any Linux runner with Docker works: install uv and sqlpackage, then `uv run pyte
 Classic SSDT projects build only on Windows, so build the dacpac in an earlier Windows job and pass it
 across as an artifact.
 
-- **GitHub Actions:** [`examples/github-actions.yml`](examples/github-actions.yml).
-- **Azure Pipelines:** [`examples/azure-pipelines/tsqltap-job.yml`](examples/azure-pipelines/tsqltap-job.yml)
+- **GitHub Actions:** [`examples/github-actions.yml`](https://github.com/semics-tech/tsqltap/blob/main/examples/github-actions.yml).
+- **Azure Pipelines:** [`examples/azure-pipelines/tsqltap-job.yml`](https://github.com/semics-tech/tsqltap/blob/main/examples/azure-pipelines/tsqltap-job.yml)
   is a reusable job template. Each assertion appears in the run's Tests tab.
 
 ## Limits
@@ -326,4 +388,4 @@ Also from Semics: [remote-sql-agent](https://github.com/semics-tech/remote-sql-a
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/semics-tech/tsqltap/blob/main/LICENSE).

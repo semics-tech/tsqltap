@@ -358,8 +358,8 @@ Any Linux runner with Docker works: install uv and sqlpackage, then `uv run pyte
 Classic SSDT projects build only on Windows, so build the dacpac in an earlier Windows job and pass it
 across as an artifact.
 
-- **GitHub Actions:** [`examples/github-actions.yml`](examples/github-actions.yml).
-- **Azure Pipelines:** [`examples/azure-pipelines/tsqltap-job.yml`](examples/azure-pipelines/tsqltap-job.yml)
+- **GitHub Actions:** [`examples/github-actions.yml`](https://github.com/semics-tech/tsqltap/blob/main/examples/github-actions.yml).
+- **Azure Pipelines:** [`examples/azure-pipelines/tsqltap-job.yml`](https://github.com/semics-tech/tsqltap/blob/main/examples/azure-pipelines/tsqltap-job.yml)
   is a reusable job template. Each assertion appears in the run's Tests tab.
 
 ## Limits
@@ -385,4 +385,4 @@ Also from Semics: [remote-sql-agent](https://github.com/semics-tech/remote-sql-a
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/semics-tech/tsqltap/blob/main/LICENSE).

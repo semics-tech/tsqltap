@@ -3,6 +3,9 @@
 pgTAP-style testing for SQL Server. You write assertions in T-SQL, pytest runs them, and every
 run gets a disposable SQL Server container.
 
+tSQLt isn't well supported anymore and feels clunky and short on features. tsqltap is a SQL Server
+testing tool in the mould of pgTAP, which is simple and proven.
+
 ```sql
 -- tests/sql/notification.test.sql
 INSERT App.Notification (Title, Body, [Type], IsActive) VALUES (N'current', N'x', 'info', 1);

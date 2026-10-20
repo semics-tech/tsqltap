@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- Added SECURITY.md with a private vulnerability reporting route.
 - Docs: quickstart, comparison with tSQLt and pgTAP, and absolute links so the PyPI page renders.
 
 ## [0.1.0]

@@ -384,7 +384,7 @@ across as an artifact.
 
 ## From the same team
 
-Also from Semics: [remote-sql-agent](https://github.com/semics-tech/remote-sql-agent).
+[Remote SQL Agent](https://github.com/semics-tech/remote-sql-agent) monitors and manages SQL Server Agent jobs across all your servers from one dashboard, with outbound-only connections and no inbound firewall ports.
 
 ## Licence
 

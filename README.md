@@ -21,6 +21,10 @@ $ uv run pytest
 tests/sql/notification.test.sql::notification ,,.          [100%]
 ```
 
+`tap` itself is pure T-SQL; pytest is only the runner. You can install `tap` into any database and
+use it from SSMS or `sqlcmd` without Python: see
+[Use tap without Python](https://github.com/semics-tech/tsqltap/blob/main/docs/use-without-python.md).
+
 ## Quickstart (about 10 minutes)
 
 You need Python ≥ 3.12, uv and a running Docker. No dacpac is needed: this starts from an empty
@@ -361,7 +365,11 @@ Any Linux runner with Docker works: install uv and sqlpackage, then `uv run pyte
 Classic SSDT projects build only on Windows, so build the dacpac in an earlier Windows job and pass it
 across as an artifact.
 
-- **GitHub Actions:** [`examples/github-actions.yml`](https://github.com/semics-tech/tsqltap/blob/main/examples/github-actions.yml).
+- **GitHub Action:** `uses: semics-tech/tsqltap@main` (pin a release tag once one carries
+  `action.yml`) runs the suite on a Linux runner. Inputs: `working-directory`, `pytest-args`,
+  `junit-file`, `install-sqlpackage`, `tsqltap-version`. Your project must declare tsqltap as a
+  dependency (`uv add --dev tsqltap`) and be checked out first.
+- **GitHub Actions workflow:** [`examples/github-actions.yml`](https://github.com/semics-tech/tsqltap/blob/main/examples/github-actions.yml).
 - **Azure Pipelines:** [`examples/azure-pipelines/tsqltap-job.yml`](https://github.com/semics-tech/tsqltap/blob/main/examples/azure-pipelines/tsqltap-job.yml)
   is a reusable job template. Each assertion appears in the run's Tests tab.
 
@@ -369,6 +377,9 @@ across as an artifact.
 
 - **Engine:** the container runs the SQL Server box engine. Azure SQL Database-only behaviour isn't
   covered; mark such tests `requires=azure`, which is never satisfied today.
+- **Azure SQL Database:** the `tap` library and tsqltap's own tests run only on the SQL Server box
+  engine (container). Running `tap` directly in Azure SQL Database or Managed Instance is untested,
+  so treat it as unverified. Dacpacs from Azure SQL projects do publish to the container.
 - **Capabilities:** the container provides `sqlserver`, `linux`, `container` and `snapshot`. Declare
   anything else (e.g. `agent` after enabling SQL Agent) under `capabilities`.
 - **Result comparisons:**

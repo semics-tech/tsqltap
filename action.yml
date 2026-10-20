@@ -1,0 +1,59 @@
+name: tsqltap
+description: Run a database repo's tsqltap (T-SQL tests, pytest runner) suite against a disposable SQL Server container.
+author: Semics
+branding:
+  icon: check-circle
+  color: blue
+
+inputs:
+  working-directory:
+    description: Folder containing the pyproject.toml with the tsqltap config.
+    default: "."
+  pytest-args:
+    description: Extra arguments for pytest.
+    default: ""
+  junit-file:
+    description: JUnit XML output path, relative to working-directory. Empty to skip.
+    default: junit.xml
+  install-sqlpackage:
+    description: Install sqlpackage (needed only if a database config uses a dacpac).
+    default: "false"
+  tsqltap-version:
+    description: >
+      Install this version of tsqltap from PyPI (e.g. "0.1.0") instead of using the project's
+      own locked dependency. Empty to use the project's dependency.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v6
+    - name: Install sqlpackage
+      if: inputs.install-sqlpackage == 'true'
+      shell: bash
+      run: |
+        dotnet tool install -g microsoft.sqlpackage
+        echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: uv sync
+    - name: Run tsqltap
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        TSQLTAP_VERSION: ${{ inputs.tsqltap-version }}
+        PYTEST_ARGS: ${{ inputs.pytest-args }}
+        JUNIT_FILE: ${{ inputs.junit-file }}
+      run: |
+        args=()
+        if [ -n "$JUNIT_FILE" ]; then
+          args+=(--junitxml="$JUNIT_FILE" -o junit_family=xunit2)
+        fi
+        with=()
+        if [ -n "$TSQLTAP_VERSION" ]; then
+          with+=(--with "tsqltap==$TSQLTAP_VERSION")
+        fi
+        # PYTEST_ARGS is deliberately word-split so callers can pass several flags.
+        # shellcheck disable=SC2086
+        uv run "${with[@]}" pytest "${args[@]}" $PYTEST_ARGS

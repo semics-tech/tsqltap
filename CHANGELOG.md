@@ -6,6 +6,9 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- `tsqltap script` writes the `tap` library as one standalone `tap.sql`, for SSMS or `sqlcmd` use.
+- Docs: "Use tap from SSMS / sqlcmd without Python", and a note that Azure SQL Database is untested.
+- A composite GitHub Action (`action.yml`) that runs the suite in CI.
 - Added SECURITY.md with a private vulnerability reporting route.
 - Docs: quickstart, comparison with tSQLt and pgTAP, and absolute links so the PyPI page renders.
 

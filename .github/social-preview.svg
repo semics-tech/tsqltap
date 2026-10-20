@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <rect width="1280" height="640" fill="#0f172a"/>
+  <rect x="0" y="0" width="16" height="640" fill="#22c55e"/>
+  <text x="90" y="150" font-family="Menlo, Courier New, monospace" font-size="34" fill="#22c55e">ok 1 - results_eq</text>
+  <text x="90" y="200" font-family="Menlo, Courier New, monospace" font-size="34" fill="#22c55e">ok 2 - throws_ok</text>
+  <text x="90" y="340" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="150" font-weight="700" fill="#f8fafc">tsqltap</text>
+  <text x="94" y="430" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="52" fill="#cbd5e1">pgTAP-style testing for SQL Server</text>
+  <text x="94" y="500" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="34" fill="#94a3b8">T-SQL assertions, run by pytest, in a disposable container</text>
+  <text x="94" y="590" font-family="Menlo, Courier New, monospace" font-size="28" fill="#64748b">github.com/semics-tech/tsqltap</text>
+</svg>

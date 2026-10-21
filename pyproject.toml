@@ -1,6 +1,6 @@
 [project]
 name = "tsqltap"
-version = "0.1.0"
+version = "0.1.1"
 description = "pgTAP-style testing for SQL Server: T-SQL assertions, a pytest runner, disposable containers"
 authors = [{ name = "Oliver Breeden" }]
 readme = "README.md"

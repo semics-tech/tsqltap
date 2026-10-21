@@ -1,0 +1,40 @@
+name: Release tap.sql
+
+# Attaches the standalone tap.sql to the GitHub release for a version tag.
+#
+# This is triggered by the tag push (not `release: published`) because the release is
+# created by release.yml with GITHUB_TOKEN, and events from GITHUB_TOKEN never start
+# other workflows. So we wait here for that release to appear, then upload.
+# tap.sql is deliberately kept out of dist/ so the PyPI publish never sees it.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  tap-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Generate the standalone tap.sql
+        run: uv run tsqltap script -o tap.sql
+      - name: Wait for the release, then upload tap.sql
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          for i in $(seq 1 60); do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release upload "$TAG" tap.sql --clobber
+              exit 0
+            fi
+            echo "Release $TAG not created yet (attempt $i); waiting 20s"
+            sleep 20
+          done
+          echo "::error::Release $TAG never appeared"
+          exit 1

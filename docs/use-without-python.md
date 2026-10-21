@@ -12,8 +12,7 @@ per-assertion JUnit. You get the same assertions and mocks.
 
 `tap.sql` is generated from the same files the runner installs, so it never drifts from them.
 
-- From a release: download `tap.sql` from the release's assets, once one is attached (see the note
-  at the end).
+- From a release: download `tap.sql` from the release's assets.
 - From the package (needs Python only for this one step):
 
   ```console
@@ -70,6 +69,28 @@ Notes:
   refuse to run outside a transaction.
 - Because results are streamed back rather than stored, they survive a `ROLLBACK` inside the code
   under test.
+
+## 4. Uninstall
+
+When you are done, remove `tap` from the database. It only owns the `tap` schema, so this drops
+every procedure and function in it, then the schema itself. Nothing else is touched.
+
+```sql
+DECLARE @sql NVARCHAR(MAX) = N'';
+
+SELECT @sql += N'DROP ' + CASE WHEN o.type = 'P' THEN N'PROCEDURE ' ELSE N'FUNCTION ' END
+             + QUOTENAME(s.name) + N'.' + QUOTENAME(o.name) + N';' + CHAR(10)
+FROM sys.objects AS o
+JOIN sys.schemas AS s ON s.schema_id = o.schema_id
+WHERE s.name = N'tap' AND o.type IN ('P', 'FN', 'IF', 'TF');
+
+EXEC sys.sp_executesql @sql;
+
+IF SCHEMA_ID(N'tap') IS NOT NULL
+    DROP SCHEMA tap;  -- errors if you put your own objects in the tap schema
+```
+
+Run it in the same database you installed into. To reinstall later, run `tap.sql` again.
 
 ## When to use the runner instead
 

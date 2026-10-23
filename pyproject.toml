@@ -44,7 +44,7 @@ tsqltap = "tsqltap.cli:main"
 tsqltap = "tsqltap.plugin"
 
 [build-system]
-requires = ["uv_build>=0.9.2,<0.10.0"]
+requires = ["uv_build>=0.9.2,<0.14.0"]
 build-backend = "uv_build"
 
 [tool.pytest.ini_options]

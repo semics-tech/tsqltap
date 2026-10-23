@@ -12,8 +12,25 @@ empty table, not a table without its rules. Foreign keys are the exception (@kee
 common reason to fake a table is to avoid seeding its parents. Re-created constraints and triggers
 keep their original names, so error messages read the same.
 
-Limits: computed columns become plain columns (SELECT INTO); a table referenced by a
-SCHEMABINDING view cannot be renamed and the call fails.
+Options (all default to 1, i.e. keep the original behaviour, except @keep_fks):
+  @keep_not_null = 0  every column becomes NULLable, so a test can INSERT just the columns it cares
+                      about. Columns of a kept PRIMARY KEY stay NOT NULL (SQL Server requires it)
+                      unless @keep_keys = 0; rowversion columns and a kept IDENTITY column (@keep_identity = 1) always
+                      stay NOT NULL.
+  @keep_identity = 0  the copy has no IDENTITY property, so tests can insert explicit ids without
+                      SET IDENTITY_INSERT.
+  @tsqlt_compatible = 1  shorthand: sets @keep_defaults, @keep_checks, @keep_keys, @keep_fks,
+                      @keep_triggers, @keep_not_null and @keep_identity to 0, like tSQLt.FakeTable.
+                      It overrides those arguments. Passing it as 0 changes nothing.
+
+Differences from tSQLt.FakeTable: by default tap.fake_table keeps NOT NULL, IDENTITY and the
+constraints and triggers (see above), while tSQLt drops all of them (and its @Identity, @ComputedColumns
+and @Defaults switches default to off). Use @tsqlt_compatible = 1 for tSQLt's behaviour; computed
+columns are plain columns either way. Unlike tSQLt there is no switch to keep computed columns.
+
+Limits: a table referenced by a SCHEMABINDING view cannot be renamed and the call fails. Column
+types are re-stated for ALTER COLUMN from their base system type, so alias (user-defined) types
+become their base type when @keep_not_null = 0.
 */
 CREATE OR ALTER PROCEDURE tap.fake_table
 	@table NVARCHAR(400)
@@ -22,10 +39,22 @@ CREATE OR ALTER PROCEDURE tap.fake_table
 	,@keep_keys BIT = 1
 	,@keep_fks BIT = 0
 	,@keep_triggers BIT = 1
+	,@keep_not_null BIT = 1
+	,@keep_identity BIT = 1
+	,@tsqlt_compatible BIT = 0
 AS
 SET NOCOUNT ON;
 
 DECLARE @msg NVARCHAR(2048);
+
+IF @tsqlt_compatible = 1
+	SELECT @keep_defaults = 0
+		,@keep_checks = 0
+		,@keep_keys = 0
+		,@keep_fks = 0
+		,@keep_triggers = 0
+		,@keep_not_null = 0
+		,@keep_identity = 0;
 
 IF @@TRANCOUNT = 0
 	THROW 50001, N'tap.fake_table needs an open transaction so the swap is undone afterwards', 1;
@@ -150,9 +179,59 @@ DEALLOCATE moves;
 
 EXEC sys.sp_rename @full, @moved;
 
-DECLARE @sql NVARCHAR(MAX) = N'SELECT TOP (0) * INTO ' + @full + N' FROM ' + QUOTENAME(@schema) + N'.' + QUOTENAME(@moved) + N';';
+DECLARE @collist NVARCHAR(MAX) = N'*';
+
+-- SELECT INTO keeps IDENTITY unless the column is part of an expression: ISNULL(c, c) drops the
+-- property and, the column being NOT NULL, keeps the type and NOT NULL.
+IF @keep_identity = 0
+	AND EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @id AND is_identity = 1)
+	SELECT @collist = STRING_AGG(CONVERT(NVARCHAR(MAX), CASE
+					WHEN c.is_identity = 1
+						THEN N'ISNULL(' + QUOTENAME(c.name) + N', ' + QUOTENAME(c.name) + N') AS ' + QUOTENAME(c.name)
+					ELSE QUOTENAME(c.name)
+					END), N', ') WITHIN GROUP (ORDER BY c.column_id)
+	FROM sys.columns c
+	WHERE c.object_id = @id;
+
+DECLARE @sql NVARCHAR(MAX) = N'SELECT TOP (0) ' + @collist + N' INTO ' + @full + N' FROM ' + QUOTENAME(@schema) + N'.' + QUOTENAME(@moved) + N';';
 
 EXEC sys.sp_executesql @sql;
+
+-- Make columns nullable before the constraints are re-created (a default must not be on the column
+-- yet). A kept PK keeps its columns NOT NULL; rowversion and a kept IDENTITY column stay NOT NULL.
+IF @keep_not_null = 0
+BEGIN
+	SET @sql = N'';
+
+	SELECT @sql += N'ALTER TABLE ' + @full + N' ALTER COLUMN ' + QUOTENAME(c.name) + N' '
+		+ tap.format_type(TYPE_NAME(c.system_type_id), c.max_length, c.precision, c.scale)
+		+ CASE
+			WHEN c.collation_name IS NOT NULL
+				THEN N' COLLATE ' + c.collation_name
+			ELSE N''
+			END + N' NULL;' + NCHAR(10)
+	FROM sys.columns c
+	WHERE c.object_id = @id
+		AND c.is_nullable = 0
+		AND c.is_computed = 0
+		AND NOT (c.is_identity = 1 AND @keep_identity = 1) -- an identity column cannot be NULLable
+		AND TYPE_NAME(c.system_type_id) NOT IN (N'timestamp', N'rowversion')
+		AND NOT (
+			@keep_keys = 1
+			AND EXISTS (
+				SELECT 1
+				FROM sys.key_constraints kc
+				JOIN sys.index_columns ic ON ic.object_id = kc.parent_object_id AND ic.index_id = kc.unique_index_id
+				WHERE kc.parent_object_id = @id
+					AND kc.type = 'PK'
+					AND ic.column_id = c.column_id
+				)
+			)
+	ORDER BY c.column_id;
+
+	IF @sql <> N''
+		EXEC sys.sp_executesql @sql;
+END;
 
 DECLARE @is_trigger BIT;
 DECLARE recreate CURSOR LOCAL FAST_FORWARD

@@ -6,6 +6,8 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- `tap.fake_table` takes `@keep_not_null`, `@keep_identity` and `@tsqlt_compatible` (defaults unchanged), so a test can insert only the columns it cares about, as with `tSQLt.FakeTable`.
+
 ## [0.1.1]
 
 - `tsqltap script -o tap.sql` writes the `tap` library as one standalone `tap.sql`, for SSMS or `sqlcmd` use.

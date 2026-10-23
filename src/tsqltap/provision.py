@@ -20,6 +20,7 @@ import json
 import logging
 import ntpath
 import posixpath
+import re
 import secrets
 import subprocess
 import time
@@ -64,6 +65,9 @@ DEFAULT_PUBLISH = {
 BASE_CAPABILITIES = frozenset({"sqlserver", "linux", "container", "snapshot"})
 
 
+MIN_SQLPACKAGE_MAJOR = 170
+
+
 class ProvisionError(Exception):
     pass
 
@@ -103,6 +107,7 @@ class Environment:
         self._pool: dict[str, Db] = {}
         self._baseline: dict[int, tuple[object, ...] | None] = {}
         self._master: Db | None = None
+        self._sqlpackage_checked = False
 
     # ------------------------------------------------------------------ container
 
@@ -370,16 +375,56 @@ class Environment:
             *(f"/p:{k}={_prop(v)}" for k, v in props.items()),
             *(f"/v:{k}={v}" for k, v in dbcfg.variables.items()),
         ]
+        self._check_sqlpackage_version()
         log.info("publishing %s", dbcfg.dacpac.name)
         try:
-            proc = subprocess.run(args, capture_output=True, text=True, check=False)
+            proc = subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                timeout=self.cfg.publish_timeout,
+            )
         except FileNotFoundError as exc:
             raise ProvisionError(
                 f"sqlpackage not found ({self.cfg.sqlpackage}): install it with `dotnet tool install -g microsoft.sqlpackage`"
             ) from exc
+        except subprocess.TimeoutExpired as exc:
+            output = (_text(exc.stdout) + _text(exc.stderr)).strip().splitlines()
+            raise ProvisionError(
+                f"sqlpackage publish of {dbcfg.name} timed out after {self.cfg.publish_timeout:g}s "
+                "(raise publish_timeout, or check the sqlpackage version: TSQLTAP_SQLPACKAGE selects the binary)"
+                + (":\n" + "\n".join(output[-40:]) if output else " with no output")
+            ) from exc
         if proc.returncode != 0:
             output = (proc.stdout + proc.stderr).strip().splitlines()
             raise ProvisionError(f"sqlpackage publish of {dbcfg.name} failed:\n" + "\n".join(output[-40:]))
+
+    def _check_sqlpackage_version(self) -> None:
+        """Once per session, warn if sqlpackage is older than 170 (162.x has been seen to hang)."""
+        if self._sqlpackage_checked:
+            return
+        self._sqlpackage_checked = True
+        try:
+            proc = subprocess.run(
+                [self.cfg.sqlpackage, "/Version"],
+                capture_output=True,
+                text=True,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                timeout=60,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return  # the publish itself reports a missing or stuck binary
+        match = re.search(r"(\d+)\.\d+", proc.stdout)
+        if match and int(match.group(1)) < MIN_SQLPACKAGE_MAJOR:
+            log.warning(
+                "sqlpackage %s is older than %d and may hang on publish; put a newer one first on PATH "
+                "or point TSQLTAP_SQLPACKAGE at it",
+                proc.stdout.strip(),
+                MIN_SQLPACKAGE_MAJOR,
+            )
 
     @staticmethod
     def _current_fingerprint(master: Db, name: str) -> str | None:
@@ -442,6 +487,12 @@ class Environment:
         """The reason to skip, if the server lacks a required capability."""
         missing = sorted({r.lower() for r in requires} - self.capabilities)
         return f"requires {', '.join(missing)} (have: {', '.join(sorted(self.capabilities))})" if missing else None
+
+
+def _text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    return value.decode(errors="replace") if isinstance(value, bytes) else value
 
 
 def _prop(value: object) -> str:

@@ -6,6 +6,9 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- A stalled `sqlpackage` publish no longer hangs the session: stdin is detached and a `publish_timeout` (seconds, default 1800; env `TSQLTAP_PUBLISH_TIMEOUT`) raises a `ProvisionError` naming the database with the last output.
+- Warns once per session when `sqlpackage` is older than 170 (162.x has been seen to hang), pointing at `TSQLTAP_SQLPACKAGE`.
+
 ## [0.1.1]
 
 - `tsqltap script -o tap.sql` writes the `tap` library as one standalone `tap.sql`, for SSMS or `sqlcmd` use.

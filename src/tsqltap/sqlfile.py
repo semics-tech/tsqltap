@@ -110,6 +110,7 @@ class FileResult:
     error: str | None = None
     skipped: str | None = None
     isolation_broken: bool = False
+    doomed: bool = False  # isolation=transaction ended with XACT_STATE() = -1: uncommittable
     legacy: bool = False
 
     @property
@@ -117,6 +118,7 @@ class FileResult:
         return (
             self.error is not None
             or self.isolation_broken
+            or self.doomed
             or any(not a.ok if a.todo is None else a.ok for a in self.assertions)
         )
 
@@ -162,6 +164,14 @@ def collect_results(result: FileResult, sets: list[ResultSet]) -> None:
                 )
 
 
+DOOMED_MESSAGE = (
+    "the test left the transaction it was wrapped in uncommittable (XACT_STATE() = -1), so it could "
+    "not be used any further. Mark the file `-- tsqltap: isolation=snapshot`. Common causes: an "
+    "XACT_ABORT ON procedure that throws, a THROW inside a trigger, a denied TRUNCATE, a failing "
+    "ALTER PARTITION FUNCTION ... MERGE RANGE."
+)
+
+
 def run_sql_file(db: Db, path: Path, directives: Directives, root: Path | None = None) -> FileResult:
     """Run the file's batches in order and return what it asserted.
 
@@ -203,6 +213,10 @@ def run_sql_file(db: Db, path: Path, directives: Directives, root: Path | None =
             if wrapped and db.trancount == 0:
                 result.isolation_broken = True
                 break
+
+        if wrapped and not result.isolation_broken and db.trancount > 0 and db.scalar("SELECT XACT_STATE()") == -1:
+            result.doomed = True
+            result.error = DOOMED_MESSAGE + (f"\nThe last error was: {result.error}" if result.error else "")
 
         if directives.tsqlt and result.error is None and not result.isolation_broken:
             run_tsqlt(db, directives.tsqlt, result)

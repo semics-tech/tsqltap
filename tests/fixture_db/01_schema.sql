@@ -134,3 +134,15 @@ INSERT dbo.Region (RegionCode, Name) VALUES ('X1', N'Never');
 
 THROW 50999, 'thrown inside its own transaction', 1;
 GO
+
+-- Catches its own error under XACT_ABORT ON: the caller's transaction is left doomed (XACT_STATE() = -1).
+CREATE PROCEDURE dbo.usp_DoomsTransaction
+AS
+SET XACT_ABORT ON;
+
+BEGIN TRY
+	THROW 50998, 'dooms the caller''s transaction', 1;
+END TRY
+BEGIN CATCH
+END CATCH;
+GO

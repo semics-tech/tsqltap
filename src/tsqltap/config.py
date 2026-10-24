@@ -76,6 +76,9 @@ class Config:
     sql_globs: tuple[str, ...] = DEFAULT_SQL_GLOBS
     databases: list[DatabaseConfig] = field(default_factory=list)
     sqlpackage: str = "sqlpackage"
+    # Seconds a sqlpackage publish may run before it is killed and reported (a stalled one would
+    # otherwise hang the whole session).
+    publish_timeout: float = 1800
     # Extra capabilities tests may `require` (e.g. "agent" if you enable SQL Agent in the image).
     capabilities: list[str] = field(default_factory=list)
     # Server-level scripts (globs, run in master once the container is up, before any database is
@@ -165,6 +168,7 @@ def load(root: Path) -> Config:
         sql_globs=tuple(raw.get("sql_globs", DEFAULT_SQL_GLOBS)),
         databases=databases,
         sqlpackage=os.environ.get("TSQLTAP_SQLPACKAGE", raw.get("sqlpackage", "sqlpackage")),
+        publish_timeout=float(os.environ.get("TSQLTAP_PUBLISH_TIMEOUT", raw.get("publish_timeout", 1800))),
         capabilities=[str(c) for c in raw.get("capabilities", [])],
         setup=[str(x) for x in raw.get("setup", [])],
     )

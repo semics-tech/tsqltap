@@ -207,7 +207,12 @@ def run_sql_file(db: Db, path: Path, directives: Directives, root: Path | None =
                     result.error = exc.message
                 # A procedure that rolls back raises 266 (transaction count mismatch) on the way out.
                 if wrapped and db.trancount == 0:
-                    result.isolation_broken = True
+                    if "uncommittable transaction" in exc.message.lower():
+                        # SQL Server rolled the doomed transaction back at the end of the batch (3998).
+                        result.doomed = True
+                        result.error = DOOMED_MESSAGE
+                    else:
+                        result.isolation_broken = True
                 break
             collect_results(result, sets)
             if wrapped and db.trancount == 0:

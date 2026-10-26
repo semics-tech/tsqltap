@@ -206,6 +206,32 @@ def test_file_isolation_broken_by_rollback(mssql_env: Environment, tmp_path: Pat
     assert r.failed
 
 
+def test_file_doomed_transaction_recommends_snapshot(mssql_env: Environment, tmp_path: Path) -> None:
+    r = _run(mssql_env, tmp_path, "d.test.sql", "EXEC dbo.usp_DoomsTransaction;\nEXEC tap.pass N'after';")
+    assert r.doomed
+    assert not r.isolation_broken
+    assert r.failed
+    assert r.error is not None
+    assert "isolation=snapshot" in r.error and "XACT_ABORT" in r.error and "TRUNCATE" in r.error
+
+
+def test_file_doomed_transaction_is_fine_under_snapshot(mssql_env: Environment, tmp_path: Path) -> None:
+    r = _run(
+        mssql_env,
+        tmp_path,
+        "ds.test.sql",
+        "-- tsqltap: isolation=snapshot\nEXEC dbo.usp_DoomsTransaction;\nEXEC tap.pass N'after';",
+    )
+    assert not r.doomed
+    assert r.error is None
+
+
+def test_normal_file_is_not_doomed(mssql_env: Environment, tmp_path: Path) -> None:
+    r = _run(mssql_env, tmp_path, "n.test.sql", "EXEC tap.pass N'fine';")
+    assert not r.doomed
+    assert r.error is None
+
+
 def test_legacy_failure_is_not_an_error(mssql_env: Environment, tmp_path: Path) -> None:
     r = _run(
         mssql_env,

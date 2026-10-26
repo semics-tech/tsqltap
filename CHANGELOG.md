@@ -6,6 +6,8 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- A file under `isolation=transaction` that leaves its transaction uncommittable (`XACT_STATE() = -1`) now fails with a message recommending `-- tsqltap: isolation=snapshot` and listing the usual causes.
+
 ## [0.1.1]
 
 - `tsqltap script -o tap.sql` writes the `tap` library as one standalone `tap.sql`, for SSMS or `sqlcmd` use.

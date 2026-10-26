@@ -7,6 +7,7 @@ All notable changes to this project are recorded here. The format follows
 ## [Unreleased]
 
 - `tap.fake_table` takes `@keep_not_null`, `@keep_identity` and `@tsqlt_compatible` (defaults unchanged), so a test can insert only the columns it cares about, as with `tSQLt.FakeTable`.
+- A file under `isolation=transaction` that leaves its transaction uncommittable (`XACT_STATE() = -1`) now fails with a message recommending `-- tsqltap: isolation=snapshot` and listing the usual causes.
 
 ## [0.1.1]
 

@@ -265,6 +265,9 @@ Both mocks are DDL, which the test's transaction undoes. Both refuse to run outs
     default, under their original names. Foreign keys are dropped by default, so you don't need
     to seed parent tables.
   - Every part can be toggled: `@keep_defaults`, `@keep_checks`, `@keep_keys`, `@keep_fks`, `@keep_triggers`.
+  - It also keeps NOT NULL and IDENTITY by default. `@keep_not_null = 0` makes every column
+    nullable (a kept PK stays NOT NULL), `@keep_identity = 0` drops IDENTITY, and
+    `@tsqlt_compatible = 1` turns everything off, like `tSQLt.FakeTable`.
 - **`EXEC tap.spy_procedure N'dbo.usp_Notify' [, @command]`** replaces the procedure with one
   that logs each call's parameters to `tap.[SpyLog_dbo_usp_Notify]`, then runs `@command`.
   Every parameter defaults to NULL.

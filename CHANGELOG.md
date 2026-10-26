@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- `tap.fake_table` takes `@keep_not_null`, `@keep_identity` and `@tsqlt_compatible` (defaults unchanged), so a test can insert only the columns it cares about, as with `tSQLt.FakeTable`.
 - A stalled `sqlpackage` publish no longer hangs the session: stdin is detached and a `publish_timeout` (seconds, default 1800; env `TSQLTAP_PUBLISH_TIMEOUT`) raises a `ProvisionError` naming the database with the last output.
 - Warns once per session when `sqlpackage` is older than 170 (162.x has been seen to hang), pointing at `TSQLTAP_SQLPACKAGE`.
 - A file under `isolation=transaction` that leaves its transaction uncommittable (`XACT_STATE() = -1`) now fails with a message recommending `-- tsqltap: isolation=snapshot` and listing the usual causes.

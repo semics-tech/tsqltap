@@ -32,6 +32,27 @@ _CONFIG = pytest.StashKey[Config]()
 # Node ids of collected SQL tests. Module-level because pytest_runtest_logreport gets no config
 # (and reports from xdist workers arrive in the controller, which collected the same ids).
 _sql_item_ids: set[str] = set()
+# Assertions seen this session, for the summary line. Filled in the process that runs the tests, so
+# under pytest-xdist the controller has none and prints no line.
+_totals: Counter[str] = Counter()
+
+
+def format_summary(totals: Counter[str]) -> str | None:
+    """`tsqltap: 3 files, 41 assertions (38 passed, 1 failed, 2 todo)`; None when no SQL file ran."""
+    files = totals["files"]
+    if not files:
+        return None
+    n = totals["passed"] + totals["failed"] + totals["todo"]
+    parts = [f"{totals[k]} {k}" for k in ("passed", "failed", "todo") if totals[k]]
+    detail = f" ({', '.join(parts)})" if parts else ""
+    return f"tsqltap: {files} file{'s' * (files != 1)}, {n} assertion{'s' * (n != 1)}{detail}"
+
+
+def pytest_terminal_summary(terminalreporter: Any) -> None:
+    """Show the assertion count without -v: pytest folds a file's passing subtests into one pass."""
+    line = format_summary(_totals)
+    if line:
+        terminalreporter.write_line(line)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -53,6 +74,7 @@ def pytest_configure(config: pytest.Config) -> None:
         "test uses, how it is isolated (transaction | snapshot | none), which server capabilities it needs, "
         "and which other databases to reset after a snapshot-isolated test",
     )
+    _totals.clear()
     cfg = load(config.rootpath)
     if config.getoption("--tsqltap-image", None):
         cfg.image = config.getoption("--tsqltap-image")
@@ -148,6 +170,9 @@ def _sql_test(path: Path, directives: Directives) -> Callable[..., None]:
         if result.skipped:
             pytest.skip(result.skipped)
 
+        _totals["files"] += 1
+        for a in result.assertions:
+            _totals["todo" if a.todo is not None else "passed" if a.ok else "failed"] += 1
         names = _unique([a.description for a in result.assertions])
         for name, assertion in zip(names, result.assertions, strict=True):
             with subtests.test(name):

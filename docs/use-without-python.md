@@ -20,6 +20,12 @@ per-assertion JUnit. You get the same assertions and mocks.
   $ tsqltap script -o tap.sql
   ```
 
+  `tsqltap script` and the release asset arrive in 0.1.1. If `pip install tsqltap` gives you 0.1.0
+  (`tsqltap script` says "invalid choice"), install from the repository instead:
+  `pip install git+https://github.com/semics-tech/tsqltap`.
+
+You can also skip Python entirely for later upgrades: re-run the newer `tap.sql` in the same database.
+
 ## 2. Install it into a test database
 
 Install it into a **test** database (a copy of dev, or a database you can throw away), never your

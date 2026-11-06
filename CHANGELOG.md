@@ -6,6 +6,8 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- Fix: with `--tsqltap-keep`, a database is now rebuilt when any database listed above it changes, not only when its own inputs do (previously a republished `A` left `B` reused from a snapshot built against the old `A`). The first kept session after upgrading rebuilds every database after the first.
+
 ## [0.1.1]
 
 - The pytest summary ends with a line such as `tsqltap: 3 files, 41 assertions (38 passed, 1 failed, 2 todo)`, so the assertion count shows without `-v`.

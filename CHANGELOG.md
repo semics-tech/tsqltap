@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- Fails fast, with advice, when Docker is not reachable or SQL Server does not become ready: a `startup_timeout` (seconds, default 900, enough for a cold image pull; env `TSQLTAP_STARTUP_TIMEOUT`) raises a `ProvisionError` with the container's last log lines.
 - Test folders named `build` (or matching any other `norecursedirs` pattern) under a database's `tests` path are now collected instead of silently skipped, including below `**` globs; this replaces the usage error for a `tests` path itself named `build`.
 
 ## [0.1.1]

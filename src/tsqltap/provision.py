@@ -409,6 +409,19 @@ class Environment:
         self.capabilities |= {c.lower() for c in self.cfg.capabilities}
 
     def fingerprint(self, dbcfg: DatabaseConfig) -> str:
+        """Hash of everything this database was built from, including the fingerprints of the databases
+        listed above it: list order means "depends on the ones above", so republishing one rebuilds
+        every database after it."""
+        h = hashlib.sha256()
+        for earlier in self.cfg.databases:
+            if earlier is dbcfg:
+                break
+            h.update(earlier.name.encode())
+            h.update(self._own_fingerprint(earlier).encode())
+        h.update(self._own_fingerprint(dbcfg).encode())
+        return h.hexdigest()
+
+    def _own_fingerprint(self, dbcfg: DatabaseConfig) -> str:
         h = hashlib.sha256()
         h.update(
             json.dumps(

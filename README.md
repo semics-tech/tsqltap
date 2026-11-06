@@ -179,7 +179,7 @@ directive.
 
 **Cross-database projects:** list every database the project references, in dependency order.
 They all go in the same container, so three-part names resolve. Pass the database names as
-SQLCMD variables in `variables`.
+SQLCMD variables in `variables`. Defaults declared in the dacpac apply where `variables` sets nothing; a variable with no value anywhere fails before publishing, naming it.
 
 ## Writing SQL tests
 

@@ -7,6 +7,7 @@ All notable changes to this project are recorded here. The format follows
 ## [Unreleased]
 
 - Fails fast, with advice, when Docker is not reachable or SQL Server does not become ready: a `startup_timeout` (seconds, default 900, enough for a cold image pull; env `TSQLTAP_STARTUP_TIMEOUT`) raises a `ProvisionError` with the container's last log lines.
+- SQLCMD variables are read from the dacpac's `model.xml`: their `DefaultValue`s are used wherever `variables` sets nothing, and a variable with no value anywhere fails before publishing with its name (previously it published as an empty string). Publish profiles are not yet supported ([#15](https://github.com/semics-tech/tsqltap/issues/15)).
 
 ## [0.1.1]
 

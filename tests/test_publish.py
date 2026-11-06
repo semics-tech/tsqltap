@@ -81,3 +81,47 @@ def test_new_sqlpackage_does_not_warn(
     with caplog.at_level(logging.WARNING, logger="tsqltap"):
         env._publish(db)
     assert not caplog.records
+
+
+def write_dacpac(path: Path, variables: dict[str, str | None]) -> None:
+    import zipfile
+
+    els = ""
+    for name, default in variables.items():
+        prop = f'<Property Name="DefaultValue" Value="{default}" />' if default is not None else ""
+        els += f'<Element Type="SqlCmdVariable" Name="[{name}]">{prop}</Element>'
+    xml = f'<DataSchemaModel xmlns="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02"><Model>{els}</Model></DataSchemaModel>'
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("model.xml", xml)
+
+
+def test_publish_applies_dacpac_defaults_and_config_wins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    env, db = make_env(tmp_path)
+    write_dacpac(db.dacpac, {"Env": "dev", "Identity": "svc"})  # type: ignore[arg-type]
+    db.variables["Env"] = "test"
+    run, calls = fake_run()
+    monkeypatch.setattr(subprocess, "run", run)
+    env._publish(db)
+    args = next(a for a, _ in calls if "/Action:Publish" in a)
+    assert "/v:Env=test" in args and "/v:Identity=svc" in args
+    assert "/v:Env=dev" not in args
+
+
+def test_publish_names_variables_with_no_value(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    env, db = make_env(tmp_path)
+    write_dacpac(db.dacpac, {"Identity": None, "Zone": None, "Env": "dev"})  # type: ignore[arg-type]
+    db.variables["Zone"] = "a"
+    run, calls = fake_run()
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(ProvisionError, match=r"no value: Identity\."):
+        env._publish(db)
+    assert not any("/Action:Publish" in a for a, _ in calls)
+
+
+def test_unreadable_dacpac_leaves_variables_to_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    env, db = make_env(tmp_path)  # "x" bytes: not a zip
+    db.variables["A"] = "1"
+    run, calls = fake_run()
+    monkeypatch.setattr(subprocess, "run", run)
+    env._publish(db)
+    assert "/v:A=1" in next(a for a, _ in calls if "/Action:Publish" in a)

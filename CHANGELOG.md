@@ -6,6 +6,8 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- Fails fast, with advice, when Docker is not reachable or SQL Server does not become ready: a `startup_timeout` (seconds, default 900, enough for a cold image pull; env `TSQLTAP_STARTUP_TIMEOUT`) raises a `ProvisionError` with the container's last log lines.
+
 ## [0.1.1]
 
 - The pytest summary ends with a line such as `tsqltap: 3 files, 41 assertions (38 passed, 1 failed, 2 todo)`, so the assertion count shows without `-v`.

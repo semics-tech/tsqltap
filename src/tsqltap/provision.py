@@ -23,6 +23,7 @@ import posixpath
 import re
 import secrets
 import subprocess
+import threading
 import time
 from importlib import resources
 from pathlib import Path
@@ -68,8 +69,30 @@ BASE_CAPABILITIES = frozenset({"sqlserver", "linux", "container", "snapshot"})
 MIN_SQLPACKAGE_MAJOR = 170
 
 
+# Seconds to wait for the engine to answer a ping before reporting it as unreachable.
+ENGINE_PING_TIMEOUT = 30
+# Seconds for the best-effort calls made while reporting a failed start (logs, cleanup).
+ENGINE_DIAG_TIMEOUT = 10
+LOG_TAIL_LINES = 20
+
+
 class ProvisionError(Exception):
     pass
+
+
+def check_engine(timeout: float = ENGINE_PING_TIMEOUT) -> None:
+    """Fail fast, with advice, if the container engine is not running or does not answer."""
+    import docker
+
+    try:
+        docker.from_env(timeout=timeout).ping()
+    except Exception as exc:
+        raise ProvisionError(
+            f"Docker is not reachable ({type(exc).__name__}: {exc}). "
+            "Start Docker Desktop (or the docker service) and wait until it says it is running; "
+            "if it is already running but unresponsive, restart it. "
+            "DOCKER_HOST selects a non-default engine."
+        ) from exc
 
 
 def tap_scripts() -> list[tuple[str, str]]:
@@ -112,6 +135,7 @@ class Environment:
     # ------------------------------------------------------------------ container
 
     def start(self) -> ServerInfo:
+        check_engine()
         if self.keep:
             self.server = self._attach_kept()
         if self.server is None:
@@ -145,7 +169,7 @@ class Environment:
             )
         started = time.perf_counter()
         log.info("starting %s", self.cfg.image)
-        container.start()
+        self._start_with_deadline(container)
         log.info("container ready in %.1fs", time.perf_counter() - started)
         self._container = container
         return ServerInfo(
@@ -155,6 +179,77 @@ class Environment:
             user="sa",
             password=self.password,
         )
+
+    def _start_with_deadline(self, container: SqlServerContainer) -> None:
+        """container.start() (image pull, create, wait for SQL Server) with startup_timeout as a hard limit.
+
+        A hung engine call or a SQL Server that never finishes starting (typically a memory-starved
+        VM) would otherwise stall the session with no output."""
+        from testcontainers.core.config import testcontainers_config
+
+        limit = self.cfg.startup_timeout
+        # testcontainers' own readiness wait defaults to 120 s, which would cut a slow start short.
+        testcontainers_config.max_tries = max(1, int(limit / testcontainers_config.sleep_time) + 1)
+        outcome: list[BaseException] = []
+
+        def run() -> None:
+            try:
+                container.start()
+            except BaseException as exc:  # reported on the calling thread
+                outcome.append(exc)
+
+        worker = threading.Thread(target=run, name="tsqltap-container-start", daemon=True)
+        worker.start()
+        worker.join(limit)
+        if worker.is_alive():
+            tail = self._log_tail(container)
+            self._abandon(container)
+            raise ProvisionError(
+                f"SQL Server in {self.cfg.image} was not ready after {limit:g}s (image pull included). "
+                "Docker Desktop may be unresponsive: restart it. If SQL Server is running out of memory "
+                "(it needs about 2 GB), raise Docker's memory limit. On a slow connection raise "
+                "startup_timeout in [tool.tsqltap] or TSQLTAP_STARTUP_TIMEOUT (seconds)." + tail
+            )
+        if outcome:
+            exc = outcome[0]
+            if isinstance(exc, TimeoutError):
+                tail = self._log_tail(container)
+                self._abandon(container)
+                raise ProvisionError(
+                    f"SQL Server in {self.cfg.image} did not become ready: {exc}. "
+                    "Check Docker's memory limit (SQL Server needs about 2 GB) or raise startup_timeout "
+                    "in [tool.tsqltap] / TSQLTAP_STARTUP_TIMEOUT (seconds)." + tail
+                ) from exc
+            raise exc
+
+    @staticmethod
+    def _container_id(container: SqlServerContainer) -> str | None:
+        wrapped = getattr(container, "_container", None)
+        return getattr(wrapped, "id", None)
+
+    def _log_tail(self, container: SqlServerContainer) -> str:
+        """The container's last log lines, formatted for an error message ('' if unavailable)."""
+        import docker
+
+        cid = self._container_id(container)
+        if cid is None:
+            return ""
+        try:
+            raw = docker.from_env(timeout=ENGINE_DIAG_TIMEOUT).containers.get(cid).logs(tail=LOG_TAIL_LINES)
+        except Exception:
+            return ""
+        text = raw.decode("utf-8", "replace").strip() if isinstance(raw, bytes) else str(raw).strip()
+        return f"\nLast container log lines:\n{text}" if text else ""
+
+    def _abandon(self, container: SqlServerContainer) -> None:
+        """Best-effort removal of a container that failed to start (a hung engine may ignore it)."""
+        import docker
+
+        cid = self._container_id(container)
+        if cid is None:
+            return
+        with contextlib.suppress(Exception):
+            docker.from_env(timeout=ENGINE_DIAG_TIMEOUT).containers.get(cid).remove(force=True)
 
     def _attach_kept(self) -> ServerInfo | None:
         import docker

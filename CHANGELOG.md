@@ -6,6 +6,8 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- SQLCMD variables are read from the dacpac's `model.xml`: their `DefaultValue`s are used wherever `variables` sets nothing, and a variable with no value anywhere fails before publishing with its name (previously it published as an empty string). Publish profiles are not yet supported ([#15](https://github.com/semics-tech/tsqltap/issues/15)).
+
 ## [0.1.1]
 
 - The pytest summary ends with a line such as `tsqltap: 3 files, 41 assertions (38 passed, 1 failed, 2 todo)`, so the assertion count shows without `-v`.

@@ -79,6 +79,9 @@ class Config:
     # Seconds a sqlpackage publish may run before it is killed and reported (a stalled one would
     # otherwise hang the whole session).
     publish_timeout: float = 1800
+    # Seconds the container may take to pull (if needed) and become ready before the session fails
+    # with advice instead of hanging.
+    startup_timeout: float = 900
     # Extra capabilities tests may `require` (e.g. "agent" if you enable SQL Agent in the image).
     capabilities: list[str] = field(default_factory=list)
     # Server-level scripts (globs, run in master once the container is up, before any database is
@@ -169,6 +172,7 @@ def load(root: Path) -> Config:
         databases=databases,
         sqlpackage=os.environ.get("TSQLTAP_SQLPACKAGE", raw.get("sqlpackage", "sqlpackage")),
         publish_timeout=float(os.environ.get("TSQLTAP_PUBLISH_TIMEOUT", raw.get("publish_timeout", 1800))),
+        startup_timeout=float(os.environ.get("TSQLTAP_STARTUP_TIMEOUT", raw.get("startup_timeout", 900))),
         capabilities=[str(c) for c in raw.get("capabilities", [])],
         setup=[str(x) for x in raw.get("setup", [])],
     )

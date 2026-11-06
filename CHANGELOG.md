@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- Fails fast, with advice, when Docker is not reachable or SQL Server does not become ready: a `startup_timeout` (seconds, default 900, enough for a cold image pull; env `TSQLTAP_STARTUP_TIMEOUT`) raises a `ProvisionError` with the container's last log lines.
 - Fix: with `--tsqltap-keep`, a database is now rebuilt when any database listed above it changes, not only when its own inputs do (previously a republished `A` left `B` reused from a snapshot built against the old `A`). The first kept session after upgrading rebuilds every database after the first.
 
 ## [0.1.1]

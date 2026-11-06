@@ -8,7 +8,8 @@ All notable changes to this project are recorded here. The format follows
 
 - Fails fast, with advice, when Docker is not reachable or SQL Server does not become ready: a `startup_timeout` (seconds, default 900, enough for a cold image pull; env `TSQLTAP_STARTUP_TIMEOUT`) raises a `ProvisionError` with the container's last log lines.
 - Test folders named `build` (or matching any other `norecursedirs` pattern) under a database's `tests` path are now collected instead of silently skipped, including below `**` globs; this replaces the usage error for a `tests` path itself named `build`.
-- Fix: with `--tsqltap-keep`, a database is now rebuilt when any database listed above it changes, not only when its own inputs do (previously a republished `A` left `B` reused from a snapshot built against the old `A`). The first kept session after upgrading rebuilds every database after the first.- SQLCMD variables are read from the dacpac's `model.xml`: their `DefaultValue`s are used wherever `variables` sets nothing, and a variable with no value anywhere fails before publishing with its name (previously it published as an empty string). Publish profiles are not yet supported ([#15](https://github.com/semics-tech/tsqltap/issues/15)).
+- Fix: with `--tsqltap-keep`, a database is now rebuilt when any database listed above it changes, not only when its own inputs do (previously a republished `A` left `B` reused from a snapshot built against the old `A`). The first kept session after upgrading rebuilds every database after the first.
+- SQLCMD variables are read from the dacpac's `model.xml`: their `DefaultValue`s are used wherever `variables` sets nothing, and a variable with no value anywhere fails before publishing with its name (previously it published as an empty string). Publish profiles are not yet supported ([#15](https://github.com/semics-tech/tsqltap/issues/15)).
 
 ## [0.1.1]
 

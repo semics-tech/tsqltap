@@ -161,7 +161,7 @@ default is `SQL_Latin1_General_CP1_CI_AS`, and temp tables take `tempdb`'s colla
 compares temp-table columns with database columns fails with "Cannot resolve the collation
 conflict" when the two differ.
 
-**Environment overrides:** `TSQLTAP_IMAGE`, `TSQLTAP_COLLATION`, `TSQLTAP_PASSWORD`, `TSQLTAP_EDITION`, `TSQLTAP_SQLPACKAGE`, `TSQLTAP_PUBLISH_TIMEOUT` (seconds a dacpac publish may take, default 1800; also `publish_timeout` in `[tool.tsqltap]`).
+**Environment overrides:** `TSQLTAP_IMAGE`, `TSQLTAP_COLLATION`, `TSQLTAP_PASSWORD`, `TSQLTAP_EDITION`, `TSQLTAP_SQLPACKAGE`, `TSQLTAP_PUBLISH_TIMEOUT` (seconds a dacpac publish may take, default 1800; also `publish_timeout` in `[tool.tsqltap]`), `TSQLTAP_STARTUP_TIMEOUT` (seconds the container may take to pull and become ready, default 900; also `startup_timeout`). If Docker isn't running, or SQL Server doesn't come up in time, the run stops with a message saying what to try, plus the container's last log lines.
 
 **Test folders named `build`:** pytest's default `norecursedirs` skips any folder named `build`,
 matched case-insensitively on Windows, so `Tests/Build` would be silently left out. tsqltap refuses to

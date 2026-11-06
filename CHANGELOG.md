@@ -6,6 +6,8 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- Test folders named `build` (or matching any other `norecursedirs` pattern) under a database's `tests` path are now collected instead of silently skipped, including below `**` globs; this replaces the usage error for a `tests` path itself named `build`.
+
 ## [0.1.1]
 
 - The pytest summary ends with a line such as `tsqltap: 3 files, 41 assertions (38 passed, 1 failed, 2 todo)`, so the assertion count shows without `-v`.

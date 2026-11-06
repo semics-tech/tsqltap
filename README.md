@@ -164,10 +164,9 @@ conflict" when the two differ.
 **Environment overrides:** `TSQLTAP_IMAGE`, `TSQLTAP_COLLATION`, `TSQLTAP_PASSWORD`, `TSQLTAP_EDITION`, `TSQLTAP_SQLPACKAGE`, `TSQLTAP_PUBLISH_TIMEOUT` (seconds a dacpac publish may take, default 1800; also `publish_timeout` in `[tool.tsqltap]`).
 
 **Test folders named `build`:** pytest's default `norecursedirs` skips any folder named `build`,
-matched case-insensitively on Windows, so `Tests/Build` would be silently left out. tsqltap refuses to
-run if a database's `tests` folder would be skipped this way. Set `norecursedirs` in
-`[tool.pytest.ini_options]` without `build`, e.g.
-`[".*", "*.egg", "dist", "node_modules", "venv", "bin", "obj"]`.
+matched case-insensitively on Windows. tsqltap collects `*.test.sql` files in such a folder anyway when it
+sits under (or leads to) a database's `tests` path, so `Tests/Build` is not left out. Folders outside
+those paths still follow `norecursedirs`.
 
 **Which database a test runs in:**
 1. the one it names, with a `database=` directive or `@pytest.mark.mssql(database=...)`;

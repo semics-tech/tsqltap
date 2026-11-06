@@ -72,7 +72,19 @@ def test_collect_error_for_bad_directive(pytester: pytest.Pytester) -> None:
     result.stdout.fnmatch_lines(["*isolation must be one of*"])
 
 
-def test_a_tests_folder_hidden_by_norecursedirs_is_an_error(pytester: pytest.Pytester) -> None:
+def test_a_tests_folder_named_build_is_still_collected(pytester: pytest.Pytester) -> None:
     pytester.makefile(".toml", pyproject=PYPROJECT + 'tests = ["db/Tests/Build"]\n')
-    result = pytester.runpytest_inprocess("-p", "no:cacheprovider", "--collect-only")
-    result.stderr.fnmatch_lines(["*norecursedirs pattern 'build' matches the folder 'Build'*"])
+    Path(pytester.path, "db/Tests/Build").mkdir(parents=True)
+    Path(pytester.path, "db/Tests/Build/a.test.sql").write_text("SELECT 1", encoding="utf-8")
+    result = pytester.runpytest_inprocess("-p", "no:cacheprovider", "--collect-only", "-q")
+    result.stdout.fnmatch_lines(["*a.test.sql::a"])
+
+
+def test_a_build_folder_below_a_wildcard_tests_path_is_collected(pytester: pytest.Pytester) -> None:
+    pytester.makefile(".toml", pyproject=PYPROJECT + 'tests = ["db/**"]\n')
+    for d in ("db/Tests/build", "build"):
+        Path(pytester.path, d).mkdir(parents=True)
+        Path(pytester.path, d, "b.test.sql").write_text("SELECT 1", encoding="utf-8")
+    result = pytester.runpytest_inprocess("-p", "no:cacheprovider", "--collect-only", "-q")
+    result.stdout.fnmatch_lines(["db/Tests/build/b.test.sql::b"])
+    result.stdout.no_fnmatch_line("build/b.test.sql::b")

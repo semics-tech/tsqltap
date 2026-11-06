@@ -7,14 +7,14 @@ All notable changes to this project are recorded here. The format follows
 ## [Unreleased]
 
 - Fails fast, with advice, when Docker is not reachable or SQL Server does not become ready: a `startup_timeout` (seconds, default 900, enough for a cold image pull; env `TSQLTAP_STARTUP_TIMEOUT`) raises a `ProvisionError` with the container's last log lines.
+
+## [0.1.1]
+
 - The pytest summary ends with a line such as `tsqltap: 3 files, 41 assertions (38 passed, 1 failed, 2 todo)`, so the assertion count shows without `-v`.
 - `tap.fake_table` takes `@keep_not_null`, `@keep_identity` and `@tsqlt_compatible` (defaults unchanged), so a test can insert only the columns it cares about, as with `tSQLt.FakeTable`.
 - A stalled `sqlpackage` publish no longer hangs the session: stdin is detached and a `publish_timeout` (seconds, default 1800; env `TSQLTAP_PUBLISH_TIMEOUT`) raises a `ProvisionError` naming the database with the last output.
 - Warns once per session when `sqlpackage` is older than 170 (162.x has been seen to hang), pointing at `TSQLTAP_SQLPACKAGE`.
 - A file under `isolation=transaction` that leaves its transaction uncommittable (`XACT_STATE() = -1`) now fails with a message recommending `-- tsqltap: isolation=snapshot` and listing the usual causes.
-
-## [0.1.1]
-
 - `tsqltap script -o tap.sql` writes the `tap` library as one standalone `tap.sql`, for SSMS or `sqlcmd` use.
 - Each GitHub release now has `tap.sql` attached as a release asset.
 - Docs: "Use tap from SSMS / sqlcmd without Python".

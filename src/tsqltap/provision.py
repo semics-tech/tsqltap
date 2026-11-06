@@ -25,9 +25,11 @@ import secrets
 import subprocess
 import threading
 import time
+import zipfile
 from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING
+from xml.etree import ElementTree
 
 from tsqltap.config import Config, DatabaseConfig
 from tsqltap.connection import BatchError, Db, ServerInfo
@@ -93,6 +95,30 @@ def check_engine(timeout: float = ENGINE_PING_TIMEOUT) -> None:
             "if it is already running but unresponsive, restart it. "
             "DOCKER_HOST selects a non-default engine."
         ) from exc
+
+
+def dacpac_sqlcmd_variables(dacpac: Path) -> dict[str, str | None]:
+    """SQLCMD variables declared in a dacpac's model.xml, mapped to their default (None if it has none)."""
+    try:
+        with zipfile.ZipFile(dacpac) as z:
+            root = ElementTree.fromstring(z.read("model.xml"))
+    except (zipfile.BadZipFile, KeyError, ElementTree.ParseError, OSError):
+        return {}  # not readable here: let sqlpackage report whatever is wrong with the file
+    found: dict[str, str | None] = {}
+    for el in root.iter():
+        if el.tag.rpartition("}")[2] != "Element" or el.get("Type") != "SqlCmdVariable":
+            continue
+        name = (el.get("Name") or "").strip().strip("[]")
+        if not name:
+            continue
+        default = None
+        for prop in el:
+            if prop.get("Name") == "DefaultValue":
+                default = prop.get("Value")
+                if default is None:
+                    default = "".join(prop.itertext()).strip() or None
+        found[name] = default or None
+    return found
 
 
 def tap_scripts() -> list[tuple[str, str]]:
@@ -475,13 +501,24 @@ class Environment:
             "Encrypt=False;TrustServerCertificate=True"
         )
         props = {**DEFAULT_PUBLISH, **dbcfg.publish}
+        # sqlpackage ignores the project's SQLCMD defaults: apply them where the config sets nothing.
+        declared = dacpac_sqlcmd_variables(dbcfg.dacpac)
+        variables = {k: v for k, v in declared.items() if v is not None}
+        variables.update(dbcfg.variables)
+        missing = sorted(k for k in declared if k not in variables)
+        if missing:
+            raise ProvisionError(
+                f"{dbcfg.name}: {dbcfg.dacpac.name} declares SQLCMD variables with no value: "
+                + ", ".join(missing)
+                + f". Set them under [tool.tsqltap.databases.variables] for {dbcfg.name}."
+            )
         args = [
             self.cfg.sqlpackage,
             "/Action:Publish",
             f"/SourceFile:{dbcfg.dacpac}",
             f"/TargetConnectionString:{target}",
             *(f"/p:{k}={_prop(v)}" for k, v in props.items()),
-            *(f"/v:{k}={v}" for k, v in dbcfg.variables.items()),
+            *(f"/v:{k}={v}" for k, v in variables.items()),
         ]
         self._check_sqlpackage_version()
         log.info("publishing %s", dbcfg.dacpac.name)

@@ -79,29 +79,45 @@ def pytest_configure(config: pytest.Config) -> None:
     if config.getoption("--tsqltap-image", None):
         cfg.image = config.getoption("--tsqltap-image")
     config.stash[_CONFIG] = cfg
-    _check_tests_folders_are_collected(config, cfg)
 
 
-def _check_tests_folders_are_collected(config: pytest.Config, cfg: Config) -> None:
-    """Refuse to run if a database's `tests` folder would be skipped by norecursedirs.
+def _static_prefix(root: Path, glob_: str) -> Path:
+    """The leading folders of a `tests` glob that contain no wildcard."""
+    out = root
+    for part in Path(glob_.replace("\\", "/")).parts:
+        if any(c in part for c in "*?["):
+            break
+        out = out / part
+    return out
 
-    pytest's default norecursedirs includes "build" -- matched case-insensitively on Windows -- so a
-    folder such as Tests/Build would otherwise be skipped without a word, and the run would simply be
-    smaller than it should be.
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:
+    """Collect SQL test files in folders pytest's default `norecursedirs` would skip.
+
+    The default list includes "build" (case-insensitively on Windows), so a folder such as
+    Tests/Build would otherwise be dropped without a word and the run would be smaller than it
+    should be. A folder under (or leading to) a database's `tests` path is kept when it matches
+    norecursedirs but holds SQL test files. Anywhere else norecursedirs still applies.
     """
+    if not collection_path.is_dir():
+        return None
+    cfg = config.stash.get(_CONFIG, None)
+    if cfg is None:
+        return None
     patterns = [str(p) for p in config.getini("norecursedirs")]
+    if not any(fnmatch.fnmatch(collection_path.name.lower(), p.lower()) for p in patterns):
+        return None
     for db in cfg.databases:
         for glob_ in db.tests:
-            for part in Path(glob_.replace("\\", "/")).parts:
-                if any(c in part for c in "*?["):
-                    break
-                hit = next((p for p in patterns if fnmatch.fnmatch(part.lower(), p.lower())), None)
-                if hit:
-                    raise pytest.UsageError(
-                        f"[tool.tsqltap] database {db.name!r} has tests under {glob_!r}, but pytest's norecursedirs "
-                        f"pattern {hit!r} matches the folder {part!r}, so they would be skipped silently. Set "
-                        f"norecursedirs in [tool.pytest.ini_options] without it."
-                    )
+            prefix = _static_prefix(config.rootpath, glob_)
+            related = collection_path.is_relative_to(prefix) or prefix.is_relative_to(collection_path)
+            if related and any(
+                f.is_file() and any(fnmatch.fnmatch(f.name, g) for g in cfg.sql_globs)
+                for f in collection_path.rglob("*")
+            ):
+                return False
+    return None
 
 
 def pytest_collect_file(file_path: Path, parent: pytest.Collector) -> pytest.Collector | None:
